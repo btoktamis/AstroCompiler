@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Space Weather & EOP Compiler</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="app-logo">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" stroke-dasharray="4 4" stroke-linecap="round"></circle>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    <path d="M2 12h20"></path>
+                </svg>
+                <span>AstroCompiler</span>
+            </div>
+            <div class="app-version">v2.0</div>
+        </div>
+
+        <nav class="nav-menu">
+            <button class="nav-btn active" id="nav-spaceweather" data-target="spaceweather-panel">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/><circle cx="12" cy="12" r="4"/></svg>
+                <span>Space Weather</span>
+            </button>
+            <button class="nav-btn" id="nav-eop" data-target="eop-panel">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path></svg>
+                <span>EOP Compiler</span>
+            </button>
+            <button class="nav-btn" id="nav-viewer" data-target="viewer-panel">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
+                <span>Data Viewer</span>
+            </button>
+            <button class="nav-btn" id="nav-charts" data-target="charts-panel">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+                <span>Trends & Charts</span>
+            </button>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="status-indicator">
+                <span class="status-dot online"></span>
+                <span>System Ready</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Container -->
+    <main class="main-content">
+        <!-- 1. Space Weather Panel -->
+        <section class="panel active" id="spaceweather-panel">
+            <header class="panel-header">
+                <h1>Space Weather Compiler</h1>
+                <p>Compile daily indices (Kp, ap, Ap, Cp, C9, F10.7, Sunspots) directly from raw scientific feeds (GFZ Potsdam, NOAA SWPC, NASA).</p>
+            </header>
+
+            <div class="panel-body">
+                <div class="controls-card">
+                    <h2>Compiler Settings</h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="sw-format">Output Format</label>
+                            <select id="sw-format">
+                                <option value="txt">Legacy TXT (SW-All.txt)</option>
+                                <option value="csv">CSV Spreadsheet</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="sw-cache">Cache Directory</label>
+                            <input type="text" id="sw-cache" value="./cache" placeholder="./cache"/>
+                        </div>
+                        <div class="form-group span-2">
+                            <label for="sw-output">Output Path (Leave empty for default)</label>
+                            <div class="file-input-wrapper">
+                                <input type="text" id="sw-output" placeholder="e.g. C:/SpaceWeather/SW-All.txt"/>
+                                <button class="btn btn-secondary" id="btn-sw-browse">Browse</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="btn-sw-compile">
+                            <svg class="icon-spin hide" id="sw-spinner" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="4 4" stroke-linecap="round"></circle></svg>
+                            <span>Compile Space Weather</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Log Console -->
+                <div class="console-card">
+                    <div class="console-header">
+                        <span>Compiler Console Output</span>
+                        <button class="btn-text" id="btn-sw-clear">Clear</button>
+                    </div>
+                    <div class="console-body" id="sw-console">
+                        <div class="console-line system">Waiting for compilation to start...</div>
+                    </div>
+                </div>
+
+                <!-- Verification Card -->
+                <div class="stats-grid hide" id="sw-stats-card">
+                    <div class="stat-card">
+                        <div class="stat-label">Observed Days Compiled</div>
+                        <div class="stat-value" id="sw-stat-observed">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Daily Forecast (NOAA)</div>
+                        <div class="stat-value" id="sw-stat-daily">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Monthly Forecast (NASA)</div>
+                        <div class="stat-value" id="sw-stat-monthly">-</div>
+                    </div>
+                    <div class="stat-card stat-accent">
+                        <div class="stat-label">Celestrak Match Rate</div>
+                        <div class="stat-value" id="sw-stat-match">-</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. EOP Compiler Panel -->
+        <section class="panel" id="eop-panel">
+            <header class="panel-header">
+                <h1>Earth Orientation Parameters (EOP)</h1>
+                <p>Compile astronomical orientation values (pole coordinates x/y, UT1-UTC, LOD, dPsi/dEpsilon, dX/dY) from Paris Observatory and USNO.</p>
+            </header>
+
+            <div class="panel-body">
+                <div class="controls-card">
+                    <h2>EOP Settings</h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="eop-format">Output Format</label>
+                            <select id="eop-format">
+                                <option value="txt">Legacy TXT (EOP-All.txt)</option>
+                                <option value="csv">CSV Spreadsheet</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="eop-mode">Compile Mode</label>
+                            <select id="eop-mode">
+                                <option value="offline">Raw Feeds (IERS C04 + USNO Bulletin A)</option>
+                                <option value="online">Celestrak Download Direct</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="eop-cache">Cache Directory</label>
+                            <input type="text" id="eop-cache" value="./cache" placeholder="./cache"/>
+                        </div>
+                        <div class="form-group">
+                            <label for="eop-output">Output Path (Leave empty for default)</label>
+                            <div class="file-input-wrapper">
+                                <input type="text" id="eop-output" placeholder="e.g. C:/SpaceWeather/EOP-All.txt"/>
+                                <button class="btn btn-secondary" id="btn-eop-browse">Browse</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="btn-eop-compile">
+                            <svg class="icon-spin hide" id="eop-spinner" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="4 4" stroke-linecap="round"></circle></svg>
+                            <span>Compile EOP</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Log Console -->
+                <div class="console-card">
+                    <div class="console-header">
+                        <span>Compiler Console Output</span>
+                        <button class="btn-text" id="btn-eop-clear">Clear</button>
+                    </div>
+                    <div class="console-body" id="eop-console">
+                        <div class="console-line system">Waiting for compilation to start...</div>
+                    </div>
+                </div>
+
+                <!-- EOP Stats -->
+                <div class="stats-grid hide" id="eop-stats-card">
+                    <div class="stat-card">
+                        <div class="stat-label">Observed Days Merged</div>
+                        <div class="stat-value" id="eop-stat-observed">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Forecasted Days (Bulletin A)</div>
+                        <div class="stat-value" id="eop-stat-predicted">-</div>
+                    </div>
+                    <div class="stat-card stat-accent">
+                        <div class="stat-label">Observed Match Rate</div>
+                        <div class="stat-value" id="eop-stat-match">-</div>
+                    </div>
+                    <div class="stat-card stat-accent-secondary">
+                        <div class="stat-label">Predicted Match Rate</div>
+                        <div class="stat-value" id="eop-stat-match-pred">-</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. Data Viewer Panel -->
+        <section class="panel" id="viewer-panel">
+            <header class="panel-header">
+                <h1>Data Viewer</h1>
+                <p>Search, filter, and inspect the compiled astro-geophysical datasets.</p>
+            </header>
+
+            <div class="panel-body flex-layout">
+                <!-- Filter bar -->
+                <div class="filter-card">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label for="viewer-source">Dataset</label>
+                            <select id="viewer-source">
+                                <option value="sw-obs">Space Weather Observed</option>
+                                <option value="sw-pred">Space Weather Forecast (Daily)</option>
+                                <option value="sw-month">Space Weather Forecast (Monthly)</option>
+                                <option value="eop-obs">EOP Observed</option>
+                                <option value="eop-pred">EOP Predicted</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filter-date-start">Start Date</label>
+                            <input type="date" id="filter-date-start"/>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filter-date-end">End Date</label>
+                            <input type="date" id="filter-date-end"/>
+                        </div>
+                        <div class="filter-group sw-filter-fields">
+                            <label for="filter-kp">Min Kp (x10)</label>
+                            <input type="number" id="filter-kp" min="0" max="90" step="5" placeholder="e.g. 50"/>
+                        </div>
+                        <div class="filter-group button-align">
+                            <button class="btn btn-primary" id="btn-apply-filters">Apply Filters</button>
+                            <button class="btn btn-secondary" id="btn-reset-filters">Reset</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grid Data Table -->
+                <div class="table-card">
+                    <div class="table-header">
+                        <span id="table-row-count">Showing 0 rows</span>
+                        <div class="pagination">
+                            <button class="btn-icon" id="btn-page-prev">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                            </button>
+                            <span id="page-num">Page 1 of 1</span>
+                            <button class="btn-icon" id="btn-page-next">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table id="data-table">
+                            <thead>
+                                <!-- Dynamic headers -->
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="empty-state" colspan="100">No data loaded. Compile a database first or load one.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. Trends & Charts Panel -->
+        <section class="panel" id="charts-panel">
+            <header class="panel-header">
+                <h1>Trends & Charts</h1>
+                <p>Visualize geomagnetic activity and solar radio flux measurements over observed cycles and predictions.</p>
+            </header>
+
+            <div class="panel-body">
+                <div class="charts-grid-control">
+                    <div class="card controls-card compact">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="chart-metric">Indices Metric</label>
+                                <select id="chart-metric">
+                                    <option value="f107">F10.7 Solar Radio Flux (sfu)</option>
+                                    <option value="ap">Ap Geomagnetic Index (nT)</option>
+                                    <option value="isn">Sunspot Number (ISN)</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="chart-range">Timeline window</label>
+                                <select id="chart-range">
+                                    <option value="30">Last 30 Days + Daily Predictions</option>
+                                    <option value="90">Last 90 Days + Daily Predictions</option>
+                                    <option value="365">Last 365 Days + Predictions</option>
+                                    <option value="all">Full History (Monthly)</option>
+                                </select>
+                            </div>
+                            <div class="filter-group button-align">
+                                <button class="btn btn-primary" id="btn-draw-chart">Render Trend Chart</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custom SVG Chart Card -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 id="chart-title">Solar Radio Flux (F10.7) Trend</h3>
+                        <div class="chart-legend" id="chart-legend">
+                            <!-- Dynamic legend tags -->
+                        </div>
+                    </div>
+                    <div class="chart-svg-container" id="chart-svg-container">
+                        <!-- Custom rendered SVG goes here -->
+                        <div class="empty-state">Compile Space Weather data to render charts.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+<script src="./src/main.js" type="module"></script>
+</body>
+</html>
