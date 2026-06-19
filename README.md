@@ -1,8 +1,8 @@
-# Offline Space Weather Compiler & Dashboard
+# EOP and Space Weather Compiler
 
-This repository contains a modular Python application that compiles space weather indices directly from raw primary scientific feeds (GFZ Potsdam, SIDC Brussels, Penticton Canada, NOAA SWPC, and NASA) and generates the standardized `SW-All.txt` database from scratch, bypassing Celestrak.
+This repository contains a modular Python application that compiles Earth Orientation Parameters (EOP) and space weather indices directly from raw primary scientific feeds (IERS Paris Observatory, USNO, GFZ Potsdam, SIDC Brussels, Penticton Canada, NOAA SWPC, and NASA) and generates standardized `EOP-All.txt` and `SW-All.txt` databases from scratch, bypassing Celestrak.
 
-The project features a **Data Engine** that performs all calculations, a **Command Line Interface (CLI)** for automation, and a **Desktop Dashboard (GUI)** for visualization and live compatibility checks.
+The project features **Data and EOP Engines** that perform all calculations, a **Command Line Interface (CLI)** for automation, and a **Desktop Dashboard (GUI)** for visualization, compiling, and live compatibility checks.
 
 ---
 
@@ -11,16 +11,19 @@ The project features a **Data Engine** that performs all calculations, a **Comma
 The codebase is split into a reusable backend package (`spaceweather`) and a main launcher:
 
 *   **`main.py`**: Unified entry point. Launches the graphical desktop app by default, or runs in CLI mode if command-line arguments are provided.
-*   **`spaceweather/engine.py`**: The core data engine. Handles raw downloads, parsing, math calculations, chronological data merging, file export (TXT/CSV), and verification.
-*   **`spaceweather/cli.py`**: Exposes compiler settings, output formatting, and validation directly to the terminal.
-*   **`spaceweather/gui.py`**: Desktop GUI using standard `tkinter` with a dark theme (Catppuccin color scheme). It displays compiler logs, provides a searchable grid of compiled values, and draws trend charts (using matplotlib or Canvas fallback).
+*   **`spaceweather/engine.py`**: The core space weather data engine. Handles raw downloads, parsing, calculations, moving averages, and file export (TXT/CSV).
+*   **`spaceweather/eop_engine.py`**: The Earth Orientation Parameters (EOP) engine. Fetches raw data from IERS Paris Observatory and USNO, parses historical/rapid files, calculates leap seconds (DAT), handles predictions, and compiles EOP data.
+*   **`spaceweather/cli.py`**: Exposes compiler settings, EOP compilation options, output formatting, and validation directly to the terminal.
+*   **`spaceweather/gui.py`**: Desktop GUI using standard `tkinter` with a dark theme (Catppuccin color scheme). It displays compiler logs for both Space Weather and EOP, provides a searchable grid of compiled space weather values, and draws trend charts.
 *   **`requirements.txt`**: Minimal requirements (`requests`, `numpy`, `pandas`, `matplotlib`). The codebase automatically falls back to standard library modules if these are not installed, allowing zero-dependency execution.
 
 ---
 
 ## 2. Primary Scientific Data Feeds
 
-The engine fetches and merges the following raw sources:
+The compiler retrieves raw data from primary international astronomical and geophysical services.
+
+### 2.1. Space Weather Data Feeds
 
 | Source | Organization | Purpose | URL |
 | :--- | :--- | :--- | :--- |
@@ -32,6 +35,16 @@ The engine fetches and merges the following raw sources:
 | **Monthly Solar Flux** | NASA | 18-year monthly predicted F10.7 Adjusted (50%) | `https://www.nasa.gov/wp-content/uploads/{yyyy}/{mm}/{month}{yyyy}f10-prd.txt` |
 
 *Note: The monthly prediction files on the NASA server are published dynamically in a subfolder corresponding to the publication month. The engine automatically crawls the URLs, falling back month-by-month if the current month's publication has not yet been uploaded.*
+
+### 2.2. Earth Orientation Parameters (EOP) Data Feeds
+
+| Source | Organization | Purpose | URL |
+| :--- | :--- | :--- | :--- |
+| **Leap Seconds (DAT)** | USNO | Raw lookup file for TAI-UTC leap seconds | `https://maia.usno.navy.mil/ser7/tai-utc.dat` |
+| **EOP 20 C04 (Standard)** | IERS Paris Observatory | Long-term standard EOP time series (1962-present) | `https://hpiers.obspm.fr/iers/eop/eopc04/eopc04.1962-now` |
+| **EOP 20 C04 (Nutation)** | IERS Paris Observatory | Historical nutation parameters (dPsi, dEpsilon) | `https://hpiers.obspm.fr/iers/eop/eopc04/eopc04.dPsi_dEps.1962-now` |
+| **Bulletin A (IAU 2000)** | USNO (IERS RS/PC) | Rapid Service/Predictions for x, y, UT1-UTC, dX, dY | `https://maia.usno.navy.mil/ser7/finals2000A.all` |
+| **Bulletin A (IAU 1980)** | USNO (IERS RS/PC) | Rapid Service/Predictions for dPsi, dEpsilon | `https://maia.usno.navy.mil/ser7/finals.all` |
 
 ---
 
@@ -114,6 +127,17 @@ The database includes 81-day centered (`Ctr81`) and 81-day backward-looking (`Ls
 4.  **Backward 81-Day Average**:
     $$\text{F10.7\_Lst81}[t] = \frac{1}{81} \sum_{k=-80}^{0} \text{F10.7}[t+k]$$
 
+### 3.5. Earth Orientation Parameters (EOP) Processing
+The IERS (International Earth Rotation and Reference Systems Service) defines Earth Orientation Parameters (EOP) to represent the rotation of the Earth. The parameters are:
+*   **$x, y$ (Polar Motion)**: Coordinates of the celestial pole in the terrestrial reference frame.
+*   **$UT1-UTC$ (Universal Time Difference)**: Difference between the rotational time scale (UT1) and the atomic time scale (UTC).
+*   **$LOD$ (Length of Day)**: Difference between the duration of the daily rotation and 86,400 seconds.
+*   **$d\Psi, d\epsilon$ (Nutation Offsets)**: Offsets in longitude and obliquity with respect to the IAU 1980 precession-nutation model.
+*   **$dX, dY$ (Celestial Pole Offsets)**: Offsets with respect to the IAU 2000 precession-nutation model.
+*   **$DAT$ (Leap Seconds)**: Total number of leap seconds subtracted from atomic time since 1972.
+
+The engine merges long-term historical records from the Paris Observatory's `eopc04` series with USNO's Bulletin A (`finals2000A.all` and `finals.all`) to provide rapid service updates and future predictions. Leap seconds are dynamically looked up from USNO's `tai-utc.dat` based on the MJD (Modified Julian Date).
+
 ---
 
 ## 4. How to Use
@@ -128,13 +152,15 @@ Simply run the script with no arguments to open the dashboard:
 ```bash
 python main.py
 ```
-*   **COMPILER Tab**: Configure output path (TXT or CSV), cache folder, download & compile raw data, and run live verification reports.
-*   **DATA VIEWER Tab**: Filter and search the database by dates or minimum geomagnetic activity (Kp).
+*   **SPACE WEATHER COMPILER Tab**: Configure output path (TXT or CSV), cache folder, download & compile raw data, and run live verification reports.
+*   **EOP COMPILER Tab**: Configure EOP output path, legacy NGA block settings, compilation mode (offline from primary feeds or online direct download from CelesTrak), and run EOP verification reports.
+*   **DATA VIEWER Tab**: Filter and search the space weather database by dates or minimum geomagnetic activity (Kp).
 *   **VISUALIZATION Tab**: Plot F10.7 Solar Flux and Ap index trends.
 
 ### 4.2. Command Line Compiler (CLI)
 You can run automated compiles or verification routines:
 
+#### Space Weather Compiler
 *   **Compile legacy text file**:
     ```bash
     python main.py --compile --output SW-All.txt --format txt --verbose
@@ -148,11 +174,29 @@ You can run automated compiles or verification routines:
     python main.py --verify
     ```
 
+#### EOP Compiler
+*   **Compile legacy text file**:
+    ```bash
+    python main.py --compile-eop --eop-output eop19620101.txt --eop-legacy --verbose
+    ```
+*   **Compile CSV spreadsheet**:
+    ```bash
+    python main.py --compile-eop --eop-output eop19620101.csv --eop-format csv --verbose
+    ```
+*   **Run EOP Celestrak Verification**:
+    ```bash
+    python main.py --verify-eop
+    ```
+*   **Transform direct from CelesTrak (Online mode)**:
+    ```bash
+    python main.py --compile-eop --eop-output eop19620101.txt --eop-online --verbose
+    ```
+
 ---
 
 ## 5. Reusing the Engine in Other Projects
 
-You can import the module as a library. Here is an example script showing how to fetch and parse space weather:
+You can import the module as a library. Here is an example script showing how to fetch and parse space weather and EOP data:
 
 ```python
 from spaceweather.engine import SpaceWeatherCompiler, get_earth_sun_distance
@@ -178,3 +222,23 @@ from datetime import datetime, timezone
 dist = get_earth_sun_distance(datetime(2026, 6, 15, tzinfo=timezone.utc))
 print(f"Earth-Sun distance on 2026-06-15 is: {dist:.6f} AU")
 ```
+
+And for Earth Orientation Parameters (EOP):
+
+```python
+from spaceweather.eop_engine import EOPCompiler
+
+# Initialize EOP compiler
+eop_compiler = EOPCompiler(cache_dir="./cache")
+
+# Run compilation (offline mode by default)
+eop_data = eop_compiler.compile(online_mode=False)
+
+# Access compiled records by MJD
+print(f"Compiled EOP records count: {len(eop_data)}")
+mjd_sample = 58848
+if mjd_sample in eop_data:
+    rec = eop_data[mjd_sample]
+    print(f"MJD {mjd_sample} -> x: {rec['x']}, y: {rec['y']}, UT1-UTC: {rec['ut1_utc']}s, DAT: {rec['dat']}s")
+```
+
