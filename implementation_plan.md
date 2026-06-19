@@ -1,81 +1,120 @@
-# Implementation Plan: Offline Space Weather Compiler & Desktop UI
+# Implementation Plan: Refactor Space Weather & EOP to Go Modules and Wails Desktop UI
 
-This plan outlines the architecture and steps to build a local, self-contained Python module that compiles space weather data directly from raw primary sources (GFZ Potsdam, SIDC, Penticton, NOAA, and NASA) and reproduces the `SW-All.txt` file format from scratch, bypassing Celestrak.
+This plan outlines the architecture and execution steps to refactor the existing Python-based offline Space Weather and Earth Orientation Parameters (EOP) compilers into separate, reusable Go modules, and present them in a single, modern desktop application using the Wails framework.
 
-The module will include:
-1. **A Data Compilation Engine** that fetches raw data, parses various text/JSON formats, computes derived values (BSRN, ND, Cp, C9, 81-day centered averages, observed/adjusted flux conversions), and generates `SW-All.txt` and `SW-All.csv`.
-2. **A Command Line Interface (CLI)** for automated compiles.
-3. **A Desktop GUI** (Tkinter-based) to run the compiler, select output directories, search/filter compiled data, and visualize geomagnetic/solar trends.
+## Proposed Architecture
+
+```mermaid
+graph TD
+    subgraph Wails Desktop App
+        Frontend[HTML/JS/CSS Frontend] <-->|IPC bindings| AppGo[app.go]
+        AppGo <--> MainGo[main.go]
+    end
+    
+    subgraph Local Go Modules
+        AppGo -->|Imports| SWGo[modules/spaceweather]
+        AppGo -->|Imports| EOPGo[modules/eop]
+    end
+
+    subgraph Scientific Feeds
+        SWGo -->|HTTP| GFZ[GFZ Potsdam]
+        SWGo -->|HTTP| NOAA[NOAA SWPC]
+        SWGo -->|HTTP| NASA[NASA]
+        EOPGo -->|HTTP| IERS[IERS Paris]
+        EOPGo -->|HTTP| USNO[USNO]
+    end
+```
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> The new implementation will completely replace the Python codebase with Go modules. The Python GUI (tkinter-based) will be replaced with a modern, HTML/CSS/JS frontend powered by Wails (Vite + Vanilla JS).
+>
+> We will configure the Go modules to be loaded locally using Go's `replace` directives inside `wailsapp/go.mod`.
 
 ---
 
 ## Proposed Changes
 
-### [New Component] Data Engine & Compiler
+### [New Component] Go Modules
 
-This component handles the downloading, merging, calculations, and exporting of the data.
+We will create two separate Go modules representing the backend calculation and parsing engines:
 
-#### [NEW] [engine.py](file:///c:/0_Project_gravity/spaceweather%20data/spaceweather/engine.py)
-* Contains functions to download and cache files locally.
-* Implements parsing logic for:
-  - GFZ Potsdam: `Kp_ap_Ap_SN_F107_since_1932.txt` and `Kp_ap_Ap_SN_F107_nowcast.txt`
-  - SIDC Brussels: Sunspot number data (`SN_d_tot_V2.0.txt` and `EISN_current.txt`)
-  - Penticton: Solar flux tables (`F107_1947_1996.txt`, `F107_1996_2007.txt`, `fluxtable.txt`)
-  - NOAA SWPC: 3-hourly Kp index JSON forecast and 45-day Ap/F10.7 forecast JSON
-  - NASA: Monthly predictions for Sunspots and F10.7 (with automatic fallback to the latest available month if the current month is not published yet).
-* Implements mathematical and physical calculations:
-  - **Bartels Rotation Number (BSRN)** and **Day within cycle (ND)** from date.
-  - **Kp to ap** and **ap to Kp** conversion and linear interpolation.
-  - **sum(ap) to Cp** classification mapping.
-  - **Cp to C9** single-digit index mapping.
-  - **81-day centered** and **81-day backward** moving averages for solar flux.
-  - **Earth-Sun distance adjustment** using J2000 orbital mechanics to scale between observed and adjusted solar flux.
-* Merges the time-series data chronologically:
-  - **Observed Data**: From 1957-10-01 to yesterday.
-  - **Daily Predicted Data**: Next 45 days (Day 1-3 using 3-hourly SWPC predictions, Day 4-45 using daily forecast, filled using NASA monthly predictions).
-  - **Monthly Predicted Data**: Next ~18 years (using NASA monthly forecast, output for the first day of each month).
+#### [NEW] [go.mod](file:///C:/Users/baris/.gemini/antigravity/worktrees/spaceweather%20data/refactor-wails-go-modules/modules/spaceweather/go.mod)
+* Space Weather Go module definition.
+
+#### [NEW] [spaceweather.go](file:///C:/Users/baris/.gemini/antigravity/worktrees/spaceweather%20data/refactor-wails-go-modules/modules/spaceweather/spaceweather.go)
+* Implements the compilation logic from `engine.py`.
+* Downloads and caches files (GFZ Potsdam, NOAA SWPC, NASA).
+* Implements calculations: Bartels Solar Rotation, J2000 Earth-Sun distance, Kp to ap (with interpolation), Cp and C9 indices, and 81-day centered and backward moving averages.
+* Writes legacy text format (`SW-All.txt`) and CSV formats.
+* Implements compatibility verification against live Celestrak data.
+
+#### [NEW] [go.mod](file:///C:/Users/baris/.gemini/antigravity/worktrees/spaceweather%20data/refactor-wails-go-modules/modules/eop/go.mod)
+* Earth Orientation Parameters Go module definition.
+
+#### [NEW] [eop.go](file:///C:/Users/baris/.gemini/antigravity/worktrees/spaceweather%20data/refactor-wails-go-modules/modules/eop/eop.go)
+* Implements the compilation logic from `eop_engine.py`.
+* Downloads and caches EOP source files (USNO TAI-UTC, Paris Observatory C04, USNO Bulletin A).
+* Parses fixed-width text data, computes DAT (atomic time offset), merges C04 observed data with Bulletin A predictions.
+* Writes legacy text (`EOP-All.txt`) and CSV formats.
+* Implements compatibility verification against live Celestrak data.
 
 ---
 
-### [New Component] User Interfaces
+### [New Component] Wails Desktop Application
 
-This component exposes the functionality via a CLI and a beautiful desktop GUI.
+We will initialize and configure a Wails desktop project:
 
-#### [NEW] [cli.py](file:///c:/0_Project_gravity/spaceweather%20data/spaceweather/cli.py)
-* Standard Python CLI parsing (`argparse`).
-* Commands:
-  - `--compile`: Run compilation and save output.
-  - `--output`: Define path and format (TXT or CSV).
-  - `--verbose`: Print status logs during downloading/processing.
+#### [NEW] [wails.json](file:///C:/Users/baris/.gemini/antigravity/worktrees/spaceweather%20data/refactor-wails-go-modules/wailsapp/wails.json)
+* Wails application configuration (window size, title, assets configuration).
 
-#### [NEW] [gui.py](file:///c:/0_Project_gravity/spaceweather%20data/spaceweather/gui.py)
-* Native Tkinter application styled with modern, clean, dark-themed aesthetics.
-* Features:
-  - **Compiler Panel**: One-click download & compile button with progress indicators and status logs.
-  - **Data Viewer**: A grid/table view to inspect the compiled database.
-  - **Search & Filter**: Search by date range, filter by high geomagnetic activity (e.g. Kp >= 50).
-  - **Trend Visualization**: A lightweight matplotlib plot (with standard library canvas fallback) showing solar flux (F10.7) and geomagnetic index (Ap) trends over the last 30 days and predictions.
+#### [NEW] [go.mod](file:///C:/Users/baris/.gemini/antigravity/worktrees/spaceweather%20data/refactor-wails-go-modules/wailsapp/go.mod)
+* Main Wails app module, importing `spaceweather` and `eop` using `replace` directives:
+  ```go
+  replace github.com/btoktamis/spaceweather => ../modules/spaceweather
+  replace github.com/btoktamis/eop => ../modules/eop
+  ```
 
-#### [NEW] [main.py](file:///c:/0_Project_gravity/spaceweather%20data/main.py)
-* Main entry point of the app.
-* Runs the GUI by default; runs the CLI if command-line arguments are provided.
+#### [NEW] [app.go](file:///C:/Users/baris/.gemini/antigravity/worktrees/spaceweather%20data/refactor-wails-go-modules/wailsapp/app.go)
+* Exposes Go methods (bindings) to the frontend:
+  * `CompileSpaceWeather(cacheDir, outDir string, format string) (Result, error)`
+  * `CompileEOP(cacheDir, outDir string, format string) (Result, error)`
+  * `LoadSpaceWeatherHistory() (Records, error)`
+  * `LoadEOPHistory() (Records, error)`
 
-#### [NEW] [requirements.txt](file:///c:/0_Project_gravity/spaceweather%20data/requirements.txt)
-* Declares standard dependencies: `requests`, `numpy`, `pandas`, `matplotlib`.
-* Note: The code will be designed to work even if only standard library dependencies are present (using `urllib` instead of `requests` and simple canvas elements instead of `matplotlib` if necessary), ensuring maximum portability.
+#### [NEW] [main.go](file:///C:/Users/baris/.gemini/antigravity/worktrees/spaceweather%20data/refactor-wails-go-modules/wailsapp/main.go)
+* Initializes the Wails window, binds `App`, and runs the application.
+
+---
+
+### [New Component] Frontend Dashboard
+
+We will design a stunning modern dashboard with a dark theme (Catppuccin color scheme):
+
+#### [NEW] [index.html](file:///C:/Users/baris/.gemini/antigravity/worktrees/spaceweather%20data/refactor-wails-go-modules/wailsapp/frontend/index.html)
+* Core structure of the application. Includes sidebar navigation for switching between "Space Weather Compiler", "EOP Compiler", "Data Viewer", and "Charts/Trends".
+
+#### [NEW] [style.css](file:///C:/Users/baris/.gemini/antigravity/worktrees/spaceweather%20data/refactor-wails-go-modules/wailsapp/frontend/src/style.css)
+* Custom CSS implementation utilizing glassmorphism (`backdrop-filter`), CSS Grid/Flexbox layouts, glowing gradients, hover animations, and custom scrollbars.
+
+#### [NEW] [main.js](file:///C:/Users/baris/.gemini/antigravity/worktrees/spaceweather%20data/refactor-wails-go-modules/wailsapp/frontend/src/main.js)
+* Frontend logic interacting with Go bindings.
+* Manages state, handles asynchronous compilation events (displaying running logs in real time), searches and filters compiled records, and draws SVG charts dynamically.
 
 ---
 
 ## Verification Plan
 
-### Automated Verification
-We will run a script to compile the file and compare it against the official `SW-All.txt` from Celestrak for consistency:
-- Check that the first observed row (1957-10-01) matches exactly.
-- Check that a row from 2000-01-01 matches exactly.
-- Check that all columns line up perfectly according to the legacy format description.
+### Automated Tests
+* We will verify compiled data against live Celestrak data using our newly written Go verification functions for both Space Weather (`verify_with_celestrak`) and EOP.
+* We will check that the generated text output matches the column alignments and formats exactly.
 
 ### Manual Verification
-- Launch the GUI and verify that the layout looks clean, modern, and dark-themed.
-- Test downloading and compiling the dataset.
-- Verify that the generated `SW-All.txt` file is created successfully.
-- Search for a specific date (e.g. today's date) and check that predicted data is rendered.
+* Run `wails dev` to run the app locally.
+* Test compiling Space Weather and EOP data, verifying that logs print in real-time.
+* View compiled tables and search/filter.
+* Interact with the dynamic charts to check if they scale correctly.
+* Run a production build of the Wails app using `wails build`.
