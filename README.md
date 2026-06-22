@@ -1,29 +1,85 @@
-# EOP and Space Weather Compiler
+# AstroCompiler (EOP and Space Weather Compiler)
 
-This repository contains a modular Python application that compiles Earth Orientation Parameters (EOP) and space weather indices directly from raw primary scientific feeds (IERS Paris Observatory, USNO, GFZ Potsdam, SIDC Brussels, Penticton Canada, NOAA SWPC, and NASA) and generates standardized `EOP-All.txt` and `SW-All.txt` databases from scratch, bypassing Celestrak.
+AstroCompiler is a modern desktop application built with **Go** and **Wails (Vite + Javascript)** that compiles Earth Orientation Parameters (EOP) and space weather indices directly from raw primary scientific feeds (IERS Paris Observatory, USNO, GFZ Potsdam, SIDC Brussels, Penticton Canada, NOAA SWPC, and NASA) and generates standardized `EOP-All.txt` and `SW-All.txt` databases.
 
-The project features **Data and EOP Engines** that perform all calculations, a **Command Line Interface (CLI)** for automation, and a **Desktop Dashboard (GUI)** for visualization, compiling, and live compatibility checks.
+The project features high-performance parsing Go engines, an interactive HTML5/CSS3 graphical dashboard for visualization, offline compilation pipelines, and on-demand live compatibility checks against Celestrak.
 
 ---
 
 ## 1. Project Architecture
 
-The codebase is split into a reusable backend package (`spaceweather`) and a main launcher:
+The repository is structured as a collection of reusable Go modules integrated into a desktop app, with legacy Python code kept in archive:
 
-*   **`main.py`**: Unified entry point. Launches the graphical desktop app by default, or runs in CLI mode if command-line arguments are provided.
-*   **`spaceweather/engine.py`**: The core space weather data engine. Handles raw downloads, parsing, calculations, moving averages, and file export (TXT/CSV).
-*   **`spaceweather/eop_engine.py`**: The Earth Orientation Parameters (EOP) engine. Fetches raw data from IERS Paris Observatory and USNO, parses historical/rapid files, calculates leap seconds (DAT), handles predictions, and compiles EOP data.
-*   **`spaceweather/cli.py`**: Exposes compiler settings, EOP compilation options, output formatting, and validation directly to the terminal.
-*   **`spaceweather/gui.py`**: Desktop GUI using standard `tkinter` with a dark theme (Catppuccin color scheme). It displays compiler logs for both Space Weather and EOP, provides a searchable grid of compiled space weather values, and draws trend charts.
-*   **`requirements.txt`**: Minimal requirements (`requests`, `numpy`, `pandas`, `matplotlib`). The codebase automatically falls back to standard library modules if these are not installed, allowing zero-dependency execution.
+```
+├── modules/
+│   ├── spaceweather/              # Reusable Space Weather Go module
+│   │   ├── go.mod
+│   │   └── spaceweather.go        # Parsers, Bartels cycles, moving averages, and TXT/CSV exporters
+│   └── eop/                       # Reusable EOP Go module
+│       ├── go.mod
+│       └── eop.go                 # Paris C04 and Bulletin A consolidation and DAT calculations
+├── wailsapp/                      # Desktop UI Application (Wails)
+│   ├── wails.json                 # Project configuration (outputs AstroCompiler.exe)
+│   ├── main.go                    # App configuration (Window settings, bindings)
+│   ├── app.go                     # Go-JS binding bridges (Compile, Save dialogs, On-Demand Verify)
+│   ├── go.mod                     # Integrates local modules via replace directives
+│   └── frontend/                  # Dashboard frontend (Vite + Vanilla JS/CSS)
+│       ├── index.html
+│       └── src/
+│           ├── main.js            # Tab controller, filter grid, and dynamic SVG chart engine
+│           └── style.css          # Catppuccin Mocha themed styling
+└── legacy/                        # Legacy Python CLI compiler
+    ├── main.py                    # Python command line launcher
+    ├── requirements.txt           # CLI dependencies (requests only)
+    └── spaceweather/              # Legacy CLI compilation engines
+```
 
 ---
 
-## 2. Primary Scientific Data Feeds
+## 2. Setup & Compilation Guide
 
-The compiler retrieves raw data from primary international astronomical and geophysical services.
+To download, compile, and run AstroCompiler on your local machine, you need to install the Go and Node.js development toolchains.
 
-### 2.1. Space Weather Data Feeds
+### 2.1. Prerequisites
+
+Before building, install the following required packages:
+
+1.  **Go Development Kit (v1.20 or newer)**:
+    *   Used to compile the backend engines.
+    *   Download from the official Go site: [go.dev/dl](https://go.dev/dl/)
+2.  **Node.js (v18 or newer & npm)**:
+    *   Used to compile frontend components and manage Vite assets.
+    *   Download from the official Node.js site: [nodejs.org](https://nodejs.org/)
+3.  **Wails CLI**:
+    *   The framework used to package HTML/JS/CSS frontend with the Go backend.
+    *   To install the Wails CLI, run the following command in your terminal:
+        ```bash
+        go install github.com/wailsapp/wails/v2/cmd/wails@latest
+        ```
+    *   Refer to the official Wails installation guide for help: [wails.io/docs/gettingstarted/installation](https://wails.io/docs/gettingstarted/installation)
+
+### 2.2. Building the Desktop Application
+
+Once you have installed the prerequisites, follow these steps to build the application:
+
+1.  Open your terminal and navigate to the `wailsapp` directory:
+    ```bash
+    cd C:/0_Project_gravity/AstroCompiler/wailsapp
+    ```
+2.  Run the production build command:
+    ```bash
+    wails build
+    ```
+3.  The compiled desktop executable will be generated at:
+    `wailsapp/build/bin/AstroCompiler.exe`
+
+---
+
+## 3. Primary Scientific Data Feeds
+
+The backend retrieves raw data from primary international astronomical and geophysical services.
+
+### 3.1. Space Weather Data Feeds
 
 | Source | Organization | Purpose | URL |
 | :--- | :--- | :--- | :--- |
@@ -34,9 +90,7 @@ The compiler retrieves raw data from primary international astronomical and geop
 | **Monthly Sunspots** | NASA | 18-year monthly predicted Sunspot Numbers (50%) | `https://www.nasa.gov/wp-content/uploads/{yyyy}/{mm}/{month}{yyyy}ssn-prd.txt` |
 | **Monthly Solar Flux** | NASA | 18-year monthly predicted F10.7 Adjusted (50%) | `https://www.nasa.gov/wp-content/uploads/{yyyy}/{mm}/{month}{yyyy}f10-prd.txt` |
 
-*Note: The monthly prediction files on the NASA server are published dynamically in a subfolder corresponding to the publication month. The engine automatically crawls the URLs, falling back month-by-month if the current month's publication has not yet been uploaded.*
-
-### 2.2. Earth Orientation Parameters (EOP) Data Feeds
+### 3.2. Earth Orientation Parameters (EOP) Data Feeds
 
 | Source | Organization | Purpose | URL |
 | :--- | :--- | :--- | :--- |
@@ -48,197 +102,29 @@ The compiler retrieves raw data from primary international astronomical and geop
 
 ---
 
-## 3. Mathematical & Physical Calculations
+## 4. Mathematical & Physical Calculations
 
-To generate the database, the engine implements several astro-physical equations:
+To generate the database, the engine implements several astronomical equations:
 
-### 3.1. Bartels Solar Rotation Number (BSRN)
-Bartels Solar Rotation numbers divide time into continuous 27-day cycles corresponding to the Sun's rotation. The cycle system is counted from **February 8, 1832**.
-Given a datetime object:
-1.  Let $D$ be the integer number of days between the target date and the epoch `1832-02-08`.
-2.  The Bartels Solar Rotation Number (BSRN) is:
-    $$\text{BSRN} = 1 + \left\lfloor \frac{D}{27} \right\rfloor$$
-3.  The Day within the rotation cycle (ND) ranges from 1 to 27:
-    $$\text{ND} = 1 + (D \pmod{27})$$
-
-### 3.2. Earth-Sun Distance (J2000 Orbital Mechanics)
-Solar radio flux (F10.7) measurements are reported as either **Observed** (the raw signal received at Earth) or **Adjusted** (scaled to 1 Astronomical Unit). The conversion uses the inverse-square law:
-$$S_{\text{obs}} = \frac{S_{\text{adj}}}{r^2}$$
-To compute the Earth-Sun distance ratio $r$ (in AU) for any date:
-1.  Compute the days $D_J$ (including decimals) since the **J2000.0 Epoch** (January 1, 2000, at 12:00 UTC).
-2.  Compute the Earth's Mean Anomaly $g$ (in radians):
-    $$g = \text{radians}(357.529 + 0.98560028 \times D_J)$$
-3.  Compute the distance $r$ (in AU) using the Keplerian approximation:
-    $$r = 1.00014 - 0.01671 \cos(g) - 0.00014 \cos(2g)$$
-
-### 3.3. Geomagnetic Indices (Kp, ap, Ap, Cp, C9)
-*   **ap (3-hour linear range)**: Map raw 3-hourly Kp floats to ap amplitudes using the standard conversion:
-
-    | Kp | 0o | 0+ | 1- | 1o | 1+ | 2- | 2o | 2+ | 3- | 3o | 3+ | 4- | 4o | 4+ | 5- | 5o | 5+ | 6- | 6o | 6+ | 7- | 7o | 7+ | 8- | 8o | 8+ | 9- | 9o |
-    |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-    | **ap** | 0 | 2 | 3 | 4 | 5 | 6 | 7 | 9 | 12 | 15 | 18 | 22 | 27 | 32 | 39 | 48 | 56 | 67 | 80 | 94 | 111 | 132 | 154 | 179 | 207 | 236 | 300 | 400 |
-
-*   **Ap (Daily average)**: Arithmetic mean of the eight 3-hourly `ap` values, rounded to the nearest integer.
-*   **Cp (Planetary Character Figure)**: Maps the daily sum of the eight 3-hourly `ap` indices ($\sum ap$) into a qualitative scale from `0.0` to `2.5` using the following step thresholds:
-    *   $\sum ap \le 22 \rightarrow 0.0$
-    *   $\sum ap \le 34 \rightarrow 0.1$
-    *   $\sum ap \le 44 \rightarrow 0.2$
-    *   $\sum ap \le 55 \rightarrow 0.3$
-    *   $\sum ap \le 66 \rightarrow 0.4$
-    *   $\sum ap \le 78 \rightarrow 0.5$
-    *   $\sum ap \le 90 \rightarrow 0.6$
-    *   $\sum ap \le 104 \rightarrow 0.7$
-    *   $\sum ap \le 120 \rightarrow 0.8$
-    *   $\sum ap \le 139 \rightarrow 0.9$
-    *   $\sum ap \le 164 \rightarrow 1.0$
-    *   $\sum ap \le 190 \rightarrow 1.1$
-    *   $\sum ap \le 228 \rightarrow 1.2$
-    *   $\sum ap \le 273 \rightarrow 1.3$
-    *   $\sum ap \le 320 \rightarrow 1.4$
-    *   $\sum ap \le 379 \rightarrow 1.5$
-    *   $\sum ap \le 453 \rightarrow 1.6$
-    *   $\sum ap \le 561 \rightarrow 1.7$
-    *   $\sum ap \le 729 \rightarrow 1.8$
-    *   $\sum ap \le 1119 \rightarrow 1.9$
-    *   $\sum ap \le 1399 \rightarrow 2.0$
-    *   $\sum ap \le 1699 \rightarrow 2.1$
-    *   $\sum ap \le 1999 \rightarrow 2.2$
-    *   $\sum ap \le 2399 \rightarrow 2.3$
-    *   $\sum ap \le 3199 \rightarrow 2.4$
-    *   $\ge 3200 \rightarrow 2.5$
-*   **C9 (Single digit)**: Group Cp into ranges:
-    *   $Cp \le 0.1 \rightarrow 0$
-    *   $Cp \le 0.3 \rightarrow 1$
-    *   $Cp \le 0.5 \rightarrow 2$
-    *   $Cp \le 0.7 \rightarrow 3$
-    *   $Cp \le 0.9 \rightarrow 4$
-    *   $Cp \le 1.1 \rightarrow 5$
-    *   $Cp \le 1.4 \rightarrow 6$
-    *   $Cp \le 1.8 \rightarrow 7$
-    *   $Cp \le 1.9 \rightarrow 8$
-    *   $\ge 2.0 \rightarrow 9$
-
-### 3.4. Moving Averages & Border Padding
-The database includes 81-day centered (`Ctr81`) and 81-day backward-looking (`Lst81`) arithmetic averages of solar flux.
-1.  **Interpolation**: The engine first scans the observed F10.7 values. Any missing measurements (flagged as `-1.0` in GFZ logs) are filled using linear interpolation.
-2.  **Concatenation**: To solve edge-case boundary problems for the centered moving average (where dates near the end of observations require future data), the engine concatenates the Observed series and the Predicted series into a single continuous array before calculating averages.
-3.  **Centered 81-Day Average**:
-    $$\text{F10.7\_Ctr81}[t] = \frac{1}{81} \sum_{k=-40}^{40} \text{F10.7}[t+k]$$
-4.  **Backward 81-Day Average**:
-    $$\text{F10.7\_Lst81}[t] = \frac{1}{81} \sum_{k=-80}^{0} \text{F10.7}[t+k]$$
-
-### 3.5. Earth Orientation Parameters (EOP) Processing
-The IERS (International Earth Rotation and Reference Systems Service) defines Earth Orientation Parameters (EOP) to represent the rotation of the Earth. The parameters are:
-*   **$x, y$ (Polar Motion)**: Coordinates of the celestial pole in the terrestrial reference frame.
-*   **$UT1-UTC$ (Universal Time Difference)**: Difference between the rotational time scale (UT1) and the atomic time scale (UTC).
-*   **$LOD$ (Length of Day)**: Difference between the duration of the daily rotation and 86,400 seconds.
-*   **$d\Psi, d\epsilon$ (Nutation Offsets)**: Offsets in longitude and obliquity with respect to the IAU 1980 precession-nutation model.
-*   **$dX, dY$ (Celestial Pole Offsets)**: Offsets with respect to the IAU 2000 precession-nutation model.
-*   **$DAT$ (Leap Seconds)**: Total number of leap seconds subtracted from atomic time since 1972.
-
-The engine merges long-term historical records from the Paris Observatory's `eopc04` series with USNO's Bulletin A (`finals2000A.all` and `finals.all`) to provide rapid service updates and future predictions. Leap seconds are dynamically looked up from USNO's `tai-utc.dat` based on the MJD (Modified Julian Date).
+*   **Bartels Solar Rotation Number (BSRN)**: Continuous 27-day cycles corresponding to the Sun's rotation. The cycle system is counted from **February 8, 1832**.
+*   **Earth-Sun Distance (J2000 Keplerian Approximation)**: Solar radio flux (F10.7) values are adjusted to 1 AU by computing Keplerian orbital distance $r$ using Mean Anomaly $g$ relative to the J2000 epoch.
+*   **Indices Conversions**: Automatic conversions from Kp to 3-hourly ap amplitudes, mapping Ap daily averages to qualitative planetary character figures Cp, and scaling Cp to C9 single digits.
+*   **Centered Moving Averages**: Computes 81-day centered and backward-looking solar flux averages. Missing measurements are solved by linear interpolation, and end-of-series boundary padding utilizes monthly NASA predicted models.
+*   **DAT (Atomic Offset)**: Leap seconds are parsed dynamically from the USNO leap second tables to calculate proper time conversions based on Modified Julian Date (MJD).
 
 ---
 
-## 4. How to Use
+## 5. Legacy Python CLI
 
-Install dependencies (optional, fallbacks will run automatically if missing):
+The original Python-based command line parser is archived in the `legacy/` directory.
+
+To run it, install the requests dependency:
 ```bash
+cd C:/0_Project_gravity/AstroCompiler/legacy
 pip install -r requirements.txt
 ```
-
-### 4.1. Graphical Desktop App (GUI)
-Simply run the script with no arguments to open the dashboard:
+To run EOP or Space Weather compiles from the command line:
 ```bash
-python main.py
+python main.py --compile --output SW-All.txt --format txt --verbose
+python main.py --compile-eop --eop-output eop19620101.txt --eop-legacy --verbose
 ```
-*   **SPACE WEATHER COMPILER Tab**: Configure output path (TXT or CSV), cache folder, download & compile raw data, and run live verification reports.
-*   **EOP COMPILER Tab**: Configure EOP output path, legacy NGA block settings, compilation mode (offline from primary feeds or online direct download from CelesTrak), and run EOP verification reports.
-*   **DATA VIEWER Tab**: Filter and search the space weather database by dates or minimum geomagnetic activity (Kp).
-*   **VISUALIZATION Tab**: Plot F10.7 Solar Flux and Ap index trends.
-
-### 4.2. Command Line Compiler (CLI)
-You can run automated compiles or verification routines:
-
-#### Space Weather Compiler
-*   **Compile legacy text file**:
-    ```bash
-    python main.py --compile --output SW-All.txt --format txt --verbose
-    ```
-*   **Compile CSV spreadsheet**:
-    ```bash
-    python main.py --compile --output SW-All.csv --format csv --verbose
-    ```
-*   **Run Celestrak Compatibility Check**:
-    ```bash
-    python main.py --verify
-    ```
-
-#### EOP Compiler
-*   **Compile legacy text file**:
-    ```bash
-    python main.py --compile-eop --eop-output eop19620101.txt --eop-legacy --verbose
-    ```
-*   **Compile CSV spreadsheet**:
-    ```bash
-    python main.py --compile-eop --eop-output eop19620101.csv --eop-format csv --verbose
-    ```
-*   **Run EOP Celestrak Verification**:
-    ```bash
-    python main.py --verify-eop
-    ```
-*   **Transform direct from CelesTrak (Online mode)**:
-    ```bash
-    python main.py --compile-eop --eop-output eop19620101.txt --eop-online --verbose
-    ```
-
----
-
-## 5. Reusing the Engine in Other Projects
-
-You can import the module as a library. Here is an example script showing how to fetch and parse space weather and EOP data:
-
-```python
-from spaceweather.engine import SpaceWeatherCompiler, get_earth_sun_distance
-
-# Initialize compiler
-compiler = SpaceWeatherCompiler(cache_dir="./cache")
-
-# Run pipeline
-data = compiler.compile()
-
-# Access compiled observed records
-print(f"Total Observed Days Compiled: {len(data['observed'])}")
-last_record = data['observed'][-1]
-print(f"Yesterday ({last_record['date']}) observed F10.7: {last_record['f107_obs']} sfu")
-
-# Access predictions
-print(f"Total Forecasted Days: {len(data['daily'])}")
-first_forecast = data['daily'][0]
-print(f"Today ({first_forecast['date']}) predicted Ap average: {first_forecast['ap_avg']} nT")
-
-# Calculate Sun distance for a specific date
-from datetime import datetime, timezone
-dist = get_earth_sun_distance(datetime(2026, 6, 15, tzinfo=timezone.utc))
-print(f"Earth-Sun distance on 2026-06-15 is: {dist:.6f} AU")
-```
-
-And for Earth Orientation Parameters (EOP):
-
-```python
-from spaceweather.eop_engine import EOPCompiler
-
-# Initialize EOP compiler
-eop_compiler = EOPCompiler(cache_dir="./cache")
-
-# Run compilation (offline mode by default)
-eop_data = eop_compiler.compile(online_mode=False)
-
-# Access compiled records by MJD
-print(f"Compiled EOP records count: {len(eop_data)}")
-mjd_sample = 58848
-if mjd_sample in eop_data:
-    rec = eop_data[mjd_sample]
-    print(f"MJD {mjd_sample} -> x: {rec['x']}, y: {rec['y']}, UT1-UTC: {rec['ut1_utc']}s, DAT: {rec['dat']}s")
-```
-
