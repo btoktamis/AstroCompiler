@@ -10,6 +10,10 @@ export function CompileSpaceWeather(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CompileSpaceWeather'](arg1, arg2, arg3, arg4);
 }
 
+export function LoadConfig() {
+  return window['go']['main']['App']['LoadConfig']();
+}
+
 export function LoadEOPCSV(arg1) {
   return window['go']['main']['App']['LoadEOPCSV'](arg1);
 }
@@ -22,6 +26,10 @@ export function LogMessage(arg1, arg2) {
   return window['go']['main']['App']['LogMessage'](arg1, arg2);
 }
 
-export function SelectDirectory() {
-  return window['go']['main']['App']['SelectDirectory']();
+export function SaveConfig(arg1) {
+  return window['go']['main']['App']['SaveConfig'](arg1);
+}
+
+export function SelectSaveFile(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SelectSaveFile'](arg1, arg2, arg3);
 }

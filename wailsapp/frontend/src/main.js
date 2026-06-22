@@ -1,5 +1,5 @@
 import './style.css';
-import { CompileSpaceWeather, CompileEOP, SelectDirectory } from '../wailsjs/go/main/App';
+import { CompileSpaceWeather, CompileEOP, SelectSaveFile, LoadConfig, SaveConfig } from '../wailsjs/go/main/App';
 import { EventsOn } from '../wailsjs/runtime/runtime';
 
 // Application State
@@ -72,13 +72,57 @@ document.getElementById("btn-eop-clear").addEventListener("click", () => {
     document.getElementById("eop-console").innerHTML = '<div class="console-line system">Console cleared. Waiting...</div>';
 });
 
-// Directory Browser Setup
+// Config Persistence
+async function saveSettingsToConfig() {
+    const config = {
+        sw_output_path: document.getElementById("sw-output").value,
+        sw_format: document.getElementById("sw-format").value,
+        sw_cache_dir: document.getElementById("sw-cache").value,
+        eop_output_path: document.getElementById("eop-output").value,
+        eop_format: document.getElementById("eop-format").value,
+        eop_cache_dir: document.getElementById("eop-cache").value,
+        eop_compile_mode: document.getElementById("eop-mode").value,
+    };
+    try {
+        await SaveConfig(config);
+    } catch (err) {
+        console.error("Failed to save config:", err);
+    }
+}
+
+async function loadSettingsFromConfig() {
+    try {
+        const config = await LoadConfig();
+        if (config) {
+            if (config.sw_output_path) document.getElementById("sw-output").value = config.sw_output_path;
+            if (config.sw_format) document.getElementById("sw-format").value = config.sw_format;
+            if (config.sw_cache_dir) document.getElementById("sw-cache").value = config.sw_cache_dir;
+            if (config.eop_output_path) document.getElementById("eop-output").value = config.eop_output_path;
+            if (config.eop_format) document.getElementById("eop-format").value = config.eop_format;
+            if (config.eop_cache_dir) document.getElementById("eop-cache").value = config.eop_cache_dir;
+            if (config.eop_compile_mode) document.getElementById("eop-mode").value = config.eop_compile_mode;
+            
+            updateViewerSourceOptions();
+        }
+    } catch (err) {
+        console.error("Failed to load config:", err);
+    }
+}
+
+// Load config on startup
+document.addEventListener("DOMContentLoaded", () => {
+    loadSettingsFromConfig();
+});
+
+// File Browser Setup (File Selection instead of Directory)
 document.getElementById("btn-sw-browse").addEventListener("click", async () => {
     try {
-        const dir = await SelectDirectory();
-        if (dir) {
-            const format = document.getElementById("sw-format").value;
-            document.getElementById("sw-output").value = dir + "/SW-All." + format;
+        const format = document.getElementById("sw-format").value;
+        const pattern = format === "csv" ? "*.csv" : "*.txt";
+        const file = await SelectSaveFile("Select Space Weather Output File", "SW-All." + format, pattern);
+        if (file) {
+            document.getElementById("sw-output").value = file;
+            saveSettingsToConfig();
         }
     } catch (err) {
         console.error(err);
@@ -87,10 +131,12 @@ document.getElementById("btn-sw-browse").addEventListener("click", async () => {
 
 document.getElementById("btn-eop-browse").addEventListener("click", async () => {
     try {
-        const dir = await SelectDirectory();
-        if (dir) {
-            const format = document.getElementById("eop-format").value;
-            document.getElementById("eop-output").value = dir + "/EOP-All." + format;
+        const format = document.getElementById("eop-format").value;
+        const pattern = format === "csv" ? "*.csv" : "*.txt";
+        const file = await SelectSaveFile("Select EOP Output File", "EOP-All." + format, pattern);
+        if (file) {
+            document.getElementById("eop-output").value = file;
+            saveSettingsToConfig();
         }
     } catch (err) {
         console.error(err);
@@ -102,17 +148,31 @@ document.getElementById("sw-format").addEventListener("change", (e) => {
     const val = document.getElementById("sw-output").value;
     if (val) {
         const ext = e.target.value;
-        const newPath = val.substring(0, val.lastIndexOf(".")) + "." + ext;
+        const lastDot = val.lastIndexOf(".");
+        const newPath = (lastDot !== -1 ? val.substring(0, lastDot) : val) + "." + ext;
         document.getElementById("sw-output").value = newPath;
     }
+    saveSettingsToConfig();
 });
 
 document.getElementById("eop-format").addEventListener("change", (e) => {
     const val = document.getElementById("eop-output").value;
     if (val) {
         const ext = e.target.value;
-        const newPath = val.substring(0, val.lastIndexOf(".")) + "." + ext;
+        const lastDot = val.lastIndexOf(".");
+        const newPath = (lastDot !== -1 ? val.substring(0, lastDot) : val) + "." + ext;
         document.getElementById("eop-output").value = newPath;
+    }
+    saveSettingsToConfig();
+});
+
+// Attach auto-save to setting inputs on change/input events
+const settingInputs = ["sw-cache", "sw-output", "eop-mode", "eop-cache", "eop-output"];
+settingInputs.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener("input", saveSettingsToConfig);
+        el.addEventListener("change", saveSettingsToConfig);
     }
 });
 

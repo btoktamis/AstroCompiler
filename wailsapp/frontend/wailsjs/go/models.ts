@@ -39,6 +39,35 @@ export namespace eop {
 
 }
 
+export namespace main {
+	
+	export class AppConfig {
+	    sw_output_path: string;
+	    sw_format: string;
+	    sw_cache_dir: string;
+	    eop_output_path: string;
+	    eop_format: string;
+	    eop_cache_dir: string;
+	    eop_compile_mode: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AppConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sw_output_path = source["sw_output_path"];
+	        this.sw_format = source["sw_format"];
+	        this.sw_cache_dir = source["sw_cache_dir"];
+	        this.eop_output_path = source["eop_output_path"];
+	        this.eop_format = source["eop_format"];
+	        this.eop_cache_dir = source["eop_cache_dir"];
+	        this.eop_compile_mode = source["eop_compile_mode"];
+	    }
+	}
+
+}
+
 export namespace spaceweather {
 	
 	export class Record {

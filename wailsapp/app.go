@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -321,9 +323,60 @@ func (a *App) LoadEOPCSV(filePath string) ([]eop.EOPRecord, error) {
 	return result, nil
 }
 
-// SelectDirectory opens a directory dialog to choose output folder.
-func (a *App) SelectDirectory() (string, error) {
-	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: "Select Output Directory",
+type AppConfig struct {
+	SpaceWeatherOutputPath string `json:"sw_output_path"`
+	SpaceWeatherFormat     string `json:"sw_format"`
+	SpaceWeatherCacheDir   string `json:"sw_cache_dir"`
+	EOPOutputPath          string `json:"eop_output_path"`
+	EOPFormat              string `json:"eop_format"`
+	EOPCacheDir            string `json:"eop_cache_dir"`
+	EOPCompileMode         string `json:"eop_compile_mode"`
+}
+
+func getConfigPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "./astro_config.json"
+	}
+	return filepath.Join(home, ".astro_config.json")
+}
+
+// LoadConfig loads the saved settings from the user's config file.
+func (a *App) LoadConfig() (AppConfig, error) {
+	var cfg AppConfig
+	path := getConfigPath()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		// Return empty default config
+		return cfg, nil
+	}
+	err = json.Unmarshal(data, &cfg)
+	if err != nil {
+		return cfg, err
+	}
+	return cfg, nil
+}
+
+// SaveConfig saves the configuration to the user's config file.
+func (a *App) SaveConfig(cfg AppConfig) error {
+	path := getConfigPath()
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
+// SelectSaveFile opens a save file dialog to choose output file path.
+func (a *App) SelectSaveFile(title, defaultFilename, pattern string) (string, error) {
+	return runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           title,
+		DefaultFilename: defaultFilename,
+		Filters: []runtime.FileFilter{
+			{
+				DisplayName: "Astro Data Files",
+				Pattern:     pattern,
+			},
+		},
 	})
 }
