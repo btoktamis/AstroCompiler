@@ -19,3 +19,7 @@ export function LogMessage(arg1:string,arg2:string):Promise<void>;
 export function SaveConfig(arg1:main.AppConfig):Promise<void>;
 
 export function SelectSaveFile(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function VerifyEOP(arg1:string,arg2:string):Promise<any>;
+
+export function VerifySpaceWeather(arg1:string,arg2:string):Promise<any>;

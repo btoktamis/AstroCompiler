@@ -1,5 +1,5 @@
 import './style.css';
-import { CompileSpaceWeather, CompileEOP, SelectSaveFile, LoadConfig, SaveConfig } from '../wailsjs/go/main/App';
+import { CompileSpaceWeather, CompileEOP, SelectSaveFile, LoadConfig, SaveConfig, VerifySpaceWeather, VerifyEOP } from '../wailsjs/go/main/App';
 import { EventsOn } from '../wailsjs/runtime/runtime';
 
 // Application State
@@ -261,6 +261,88 @@ document.getElementById("btn-eop-compile").addEventListener("click", async () =>
         line.className = "console-line error";
         line.textContent = `CRITICAL COMPILER ERROR: ${err.message || err}`;
         consoleEl.appendChild(line);
+    } finally {
+        btn.disabled = false;
+        spinner.classList.add("hide");
+    }
+});
+
+// Manual Celestrak Verification Triggers
+document.getElementById("btn-sw-verify").addEventListener("click", async () => {
+    const cacheDir = document.getElementById("sw-cache").value || "./cache";
+    const outPath = document.getElementById("sw-output").value || "";
+    
+    const btn = document.getElementById("btn-sw-verify");
+    const spinner = document.getElementById("sw-verify-spinner");
+    btn.disabled = true;
+    spinner.classList.remove("hide");
+    
+    const consoleEl = document.getElementById("sw-console");
+    const line = document.createElement("div");
+    line.className = "console-line system";
+    line.textContent = `[${new Date().toLocaleTimeString()}] Triggering manual Celestrak compatibility verification...`;
+    consoleEl.appendChild(line);
+    
+    try {
+        const res = await VerifySpaceWeather(cacheDir, outPath);
+        if (res) {
+            // Update stats cards
+            document.getElementById("sw-stats-card").classList.remove("hide");
+            const matchRate = (res.obs_match_rate * 100).toFixed(2) + "%";
+            document.getElementById("sw-stat-match").textContent = matchRate;
+            
+            const lineRes = document.createElement("div");
+            lineRes.className = "console-line success";
+            lineRes.textContent = `[${new Date().toLocaleTimeString()}] Celestrak verification complete. Match Rate: ${matchRate}`;
+            consoleEl.appendChild(lineRes);
+        }
+    } catch (err) {
+        console.error(err);
+        const lineErr = document.createElement("div");
+        lineErr.className = "console-line error";
+        lineErr.textContent = `[${new Date().toLocaleTimeString()}] Verification failed: ${err.message || err}`;
+        consoleEl.appendChild(lineErr);
+    } finally {
+        btn.disabled = false;
+        spinner.classList.add("hide");
+    }
+});
+
+document.getElementById("btn-eop-verify").addEventListener("click", async () => {
+    const cacheDir = document.getElementById("eop-cache").value || "./cache";
+    const outPath = document.getElementById("eop-output").value || "";
+    
+    const btn = document.getElementById("btn-eop-verify");
+    const spinner = document.getElementById("eop-verify-spinner");
+    btn.disabled = true;
+    spinner.classList.remove("hide");
+    
+    const consoleEl = document.getElementById("eop-console");
+    const line = document.createElement("div");
+    line.className = "console-line system";
+    line.textContent = `[${new Date().toLocaleTimeString()}] Triggering manual Celestrak compatibility verification...`;
+    consoleEl.appendChild(line);
+    
+    try {
+        const res = await VerifyEOP(cacheDir, outPath);
+        if (res) {
+            document.getElementById("eop-stats-card").classList.remove("hide");
+            const matchRate = (res.obs_match_rate * 100).toFixed(2) + "%";
+            const matchRatePred = (res.pred_match_rate * 100).toFixed(2) + "%";
+            document.getElementById("eop-stat-match").textContent = matchRate;
+            document.getElementById("eop-stat-match-pred").textContent = matchRatePred;
+            
+            const lineRes = document.createElement("div");
+            lineRes.className = "console-line success";
+            lineRes.textContent = `[${new Date().toLocaleTimeString()}] Celestrak verification complete. Observed Match Rate: ${matchRate}, Predicted: ${matchRatePred}`;
+            consoleEl.appendChild(lineRes);
+        }
+    } catch (err) {
+        console.error(err);
+        const lineErr = document.createElement("div");
+        lineErr.className = "console-line error";
+        lineErr.textContent = `[${new Date().toLocaleTimeString()}] Verification failed: ${err.message || err}`;
+        consoleEl.appendChild(lineErr);
     } finally {
         btn.disabled = false;
         spinner.classList.add("hide");

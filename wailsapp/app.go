@@ -77,18 +77,6 @@ func (a *App) CompileSpaceWeather(offline bool, cacheDir, outPath, format string
 
 	a.LogMessage("spaceweather", "Space Weather Compilation completed successfully!")
 
-	// Perform verification
-	var verifyRes interface{}
-	if formatLower != "csv" {
-		a.LogMessage("spaceweather", "Running compatibility verification with Celestrak...")
-		v, err := compiler.VerifyWithCelestrak(outPath)
-		if err == nil {
-			verifyRes = v
-		} else {
-			a.LogMessage("spaceweather", fmt.Sprintf("Verification failed: %v", err))
-		}
-	}
-
 	return map[string]interface{}{
 		"success":        true,
 		"observed_count": len(result.Observed),
@@ -97,7 +85,7 @@ func (a *App) CompileSpaceWeather(offline bool, cacheDir, outPath, format string
 		"observed":       result.Observed,
 		"daily":          result.Daily,
 		"monthly":        result.Monthly,
-		"verification":   verifyRes,
+		"verification":   nil,
 	}, nil
 }
 
@@ -140,25 +128,13 @@ func (a *App) CompileEOP(offline bool, cacheDir, outPath, format string) (map[st
 
 	a.LogMessage("eop", "EOP Compilation completed successfully!")
 
-	// Perform verification
-	var verifyRes interface{}
-	if formatLower != "csv" {
-		a.LogMessage("eop", "Running compatibility verification with Celestrak...")
-		v, err := compiler.VerifyWithCelestrak(outPath)
-		if err == nil {
-			verifyRes = v
-		} else {
-			a.LogMessage("eop", fmt.Sprintf("Verification failed: %v", err))
-		}
-	}
-
 	return map[string]interface{}{
 		"success":        true,
 		"observed_count": len(result.Observed),
 		"predicted_count": len(result.Predicted),
 		"observed":       result.Observed,
 		"predicted":      result.Predicted,
-		"verification":   verifyRes,
+		"verification":   nil,
 	}, nil
 }
 
@@ -380,3 +356,58 @@ func (a *App) SelectSaveFile(title, defaultFilename, pattern string) (string, er
 		},
 	})
 }
+
+// VerifySpaceWeather runs Celestrak verification on demand for Space Weather.
+func (a *App) VerifySpaceWeather(cacheDir, outPath string) (interface{}, error) {
+	if cacheDir == "" {
+		cacheDir = "./cache"
+	}
+	if outPath == "" {
+		outPath = "./SW-All.txt"
+	}
+
+	a.LogMessage("spaceweather", "Initializing Space Weather Verifier...")
+	compiler := &spaceweather.SpaceWeatherCompiler{
+		CacheDir: cacheDir,
+		LogCallback: func(msg string) {
+			a.LogMessage("spaceweather", msg)
+		},
+	}
+
+	a.LogMessage("spaceweather", "Running compatibility verification with Celestrak...")
+	v, err := compiler.VerifyWithCelestrak(outPath)
+	if err != nil {
+		a.LogMessage("spaceweather", fmt.Sprintf("Verification failed: %v", err))
+		return nil, err
+	}
+	a.LogMessage("spaceweather", "Verification completed successfully!")
+	return v, nil
+}
+
+// VerifyEOP runs Celestrak verification on demand for EOP.
+func (a *App) VerifyEOP(cacheDir, outPath string) (interface{}, error) {
+	if cacheDir == "" {
+		cacheDir = "./cache"
+	}
+	if outPath == "" {
+		outPath = "./EOP-All.txt"
+	}
+
+	a.LogMessage("eop", "Initializing EOP Verifier...")
+	compiler := &eop.EOPCompiler{
+		CacheDir: cacheDir,
+		LogCallback: func(msg string) {
+			a.LogMessage("eop", msg)
+		},
+	}
+
+	a.LogMessage("eop", "Running compatibility verification with Celestrak...")
+	v, err := compiler.VerifyWithCelestrak(outPath)
+	if err != nil {
+		a.LogMessage("eop", fmt.Sprintf("Verification failed: %v", err))
+		return nil, err
+	}
+	a.LogMessage("eop", "Verification completed successfully!")
+	return v, nil
+}
+

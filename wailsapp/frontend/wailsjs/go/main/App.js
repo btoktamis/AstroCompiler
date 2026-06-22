@@ -33,3 +33,11 @@ export function SaveConfig(arg1) {
 export function SelectSaveFile(arg1, arg2, arg3) {
   return window['go']['main']['App']['SelectSaveFile'](arg1, arg2, arg3);
 }
+
+export function VerifyEOP(arg1, arg2) {
+  return window['go']['main']['App']['VerifyEOP'](arg1, arg2);
+}
+
+export function VerifySpaceWeather(arg1, arg2) {
+  return window['go']['main']['App']['VerifySpaceWeather'](arg1, arg2);
+}
