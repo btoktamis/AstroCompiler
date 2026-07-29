@@ -885,9 +885,9 @@ func (c *SpaceWeatherCompiler) WriteToLegacyTXT(data *CompileResult, filePath st
 			kpSumVal += v
 		}
 
-		kpSumStr := "   "
+		kpSumStr := "    "
 		if kpSumAllValid {
-			kpSumStr = fmt.Sprintf("%3d", kpSumVal)
+			kpSumStr = fmt.Sprintf("%4d", kpSumVal)
 		}
 
 		apStr := ""
@@ -928,7 +928,7 @@ func (c *SpaceWeatherCompiler) WriteToLegacyTXT(data *CompileResult, filePath st
 		for _, v := range r.KpVals {
 			kpSumVal += v
 		}
-		kpSumStr := fmt.Sprintf("%3d", kpSumVal)
+		kpSumStr := fmt.Sprintf("%4d", kpSumVal)
 
 		apStr := ""
 		for _, v := range r.ApVals {
