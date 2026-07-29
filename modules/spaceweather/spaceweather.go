@@ -852,9 +852,21 @@ func (c *SpaceWeatherCompiler) WriteToLegacyTXT(data *CompileResult, filePath st
 	var sb strings.Builder
 
 	updatedStr := time.Now().UTC().Format("2006 Jan 02 15:04:05 UTC")
-	sb.WriteString("DATATYPE CssiSpaceWeather\n")
-	sb.WriteString("VERSION 1.2\n")
+	sb.WriteString("DATATYPE CssiSpaceWeather\n\n")
+	sb.WriteString("VERSION 1.2\n\n")
 	sb.WriteString(fmt.Sprintf("UPDATED %s\n\n", updatedStr))
+	sb.WriteString("# --------------------------------------------------------------------------------------------------------------------------------\n")
+	sb.WriteString("#                              SPACE WEATHER DATA\n")
+	sb.WriteString("# --------------------------------------------------------------------------------------------------------------------------------\n")
+	sb.WriteString("#\n")
+	sb.WriteString("# See https://celestrak.org/SpaceData/SpaceWx-format.php for format details.\n")
+	sb.WriteString("#\n")
+	sb.WriteString("# FORMAT(I4,I3,I3,I5,I3,8I3,I4,8I4,I4,F4.1,I2,I4,F6.1,I2,5F6.1)\n")
+	sb.WriteString("# --------------------------------------------------------------------------------------------------------------------------------\n")
+	sb.WriteString("#                                                                                             Adj     Adj   Adj   Obs   Obs   Obs \n")
+	sb.WriteString("# yy mm dd BSRN ND Kp Kp Kp Kp Kp Kp Kp Kp Sum Ap  Ap  Ap  Ap  Ap  Ap  Ap  Ap  Avg Cp C9 ISN F10.7 Q Ctr81 Lst81 F10.7 Ctr81 Lst81\n")
+	sb.WriteString("# --------------------------------------------------------------------------------------------------------------------------------\n")
+	sb.WriteString("#\n\n")
 
 	sb.WriteString(fmt.Sprintf("NUM_OBSERVED_POINTS %d\n", len(data.Observed)))
 	sb.WriteString("BEGIN OBSERVED\n")
