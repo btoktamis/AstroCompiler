@@ -573,12 +573,21 @@ func (c *SpaceWeatherCompiler) Compile() (*CompileResult, error) {
 	nasaSSN := c.parseNASATable(nasaSSNContent)
 	nasaF107 := c.parseNASATable(nasaF107Content)
 
-	// 3. Filter observed
+	// 3. Filter observed (only days with complete Kp observations)
 	startDate := "1957-10-01"
 	var observedRecords []Record
 	for _, r := range records {
 		if r.Date >= startDate {
-			observedRecords = append(observedRecords, r)
+			isComplete := true
+			for _, kv := range r.KpVals {
+				if kv < 0 {
+					isComplete = false
+					break
+				}
+			}
+			if isComplete {
+				observedRecords = append(observedRecords, r)
+			}
 		}
 	}
 
@@ -726,6 +735,27 @@ func (c *SpaceWeatherCompiler) Compile() (*CompileResult, error) {
 	// 6. Moving Averages Calculation
 	n := len(observedRecords)
 	var timeline []timelineItem
+
+	// Find starting index of observedRecords[0] in full records array
+	firstObsDate := observedRecords[0].Date
+	firstObsIdxInFull := 0
+	for idx, r := range records {
+		if r.Date == firstObsDate {
+			firstObsIdxInFull = idx
+			break
+		}
+	}
+
+	// Pre-pad timeline with up to 80 preceding historical records if available
+	prePadCount := 80
+	if firstObsIdxInFull < prePadCount {
+		prePadCount = firstObsIdxInFull
+	}
+	for i := firstObsIdxInFull - prePadCount; i < firstObsIdxInFull; i++ {
+		timeline = append(timeline, timelineItem{obs: records[i].F107Obs, adj: records[i].F107Adj, dataType: "HIST_PREPAD"})
+	}
+
+	// Append observed records
 	for _, r := range observedRecords {
 		timeline = append(timeline, timelineItem{obs: r.F107Obs, adj: r.F107Adj, dataType: "OBS"})
 	}
@@ -759,10 +789,10 @@ func (c *SpaceWeatherCompiler) Compile() (*CompileResult, error) {
 		adjSeries[i] = t.adj
 	}
 
-	obsInterp := interpolateSeries(obsSeries[:n])
-	adjInterp := interpolateSeries(adjSeries[:n])
+	obsInterp := interpolateSeries(obsSeries[:prePadCount+n])
+	adjInterp := interpolateSeries(adjSeries[:prePadCount+n])
 
-	for i := 0; i < n; i++ {
+	for i := 0; i < prePadCount+n; i++ {
 		timeline[i].obs = obsInterp[i]
 		timeline[i].adj = adjInterp[i]
 	}
@@ -802,24 +832,25 @@ func (c *SpaceWeatherCompiler) Compile() (*CompileResult, error) {
 
 	// Write averages back to observed
 	for idx := range observedRecords {
-		origVal := records[idx+(len(records)-len(observedRecords))].F107Obs
+		tIdx := prePadCount + idx
+		origVal := records[idx+firstObsIdxInFull].F107Obs
 		if origVal <= 0 {
 			observedRecords[idx].QFlag = 4 // Interpolated
 		} else {
 			observedRecords[idx].QFlag = 0 // Observed
 		}
 
-		observedRecords[idx].F107Obs = timeline[idx].obs
-		observedRecords[idx].F107Adj = timeline[idx].adj
-		observedRecords[idx].F107ObsCtr = timeline[idx].obsCtr
-		observedRecords[idx].F107ObsLst = timeline[idx].obsLast
-		observedRecords[idx].F107AdjCtr = timeline[idx].adjCtr
-		observedRecords[idx].F107AdjLst = timeline[idx].adjLast
+		observedRecords[idx].F107Obs = timeline[tIdx].obs
+		observedRecords[idx].F107Adj = timeline[tIdx].adj
+		observedRecords[idx].F107ObsCtr = timeline[tIdx].obsCtr
+		observedRecords[idx].F107ObsLst = timeline[tIdx].obsLast
+		observedRecords[idx].F107AdjCtr = timeline[tIdx].adjCtr
+		observedRecords[idx].F107AdjLst = timeline[tIdx].adjLast
 	}
 
 	// Write back to daily predictions
 	for idx := range dailyPredicted {
-		tIdx := n + idx
+		tIdx := prePadCount + n + idx
 		dailyPredicted[idx].QFlag = 2 // Predicted fallback
 		dailyPredicted[idx].F107Obs = timeline[tIdx].obs
 		dailyPredicted[idx].F107Adj = timeline[tIdx].adj
@@ -852,9 +883,9 @@ func (c *SpaceWeatherCompiler) WriteToLegacyTXT(data *CompileResult, filePath st
 	var sb strings.Builder
 
 	updatedStr := time.Now().UTC().Format("2006 Jan 02 15:04:05 UTC")
-	sb.WriteString("DATATYPE CssiSpaceWeather\n\n")
-	sb.WriteString("VERSION 1.2\n\n")
-	sb.WriteString(fmt.Sprintf("UPDATED %s\n\n", updatedStr))
+	sb.WriteString("DATATYPE CssiSpaceWeather\n")
+	sb.WriteString("VERSION 1.2\n")
+	sb.WriteString(fmt.Sprintf("UPDATED %s\n", updatedStr))
 	sb.WriteString("# --------------------------------------------------------------------------------------------------------------------------------\n")
 	sb.WriteString("#                              SPACE WEATHER DATA\n")
 	sb.WriteString("# --------------------------------------------------------------------------------------------------------------------------------\n")
@@ -866,7 +897,7 @@ func (c *SpaceWeatherCompiler) WriteToLegacyTXT(data *CompileResult, filePath st
 	sb.WriteString("#                                                                                             Adj     Adj   Adj   Obs   Obs   Obs \n")
 	sb.WriteString("# yy mm dd BSRN ND Kp Kp Kp Kp Kp Kp Kp Kp Sum Ap  Ap  Ap  Ap  Ap  Ap  Ap  Ap  Avg Cp C9 ISN F10.7 Q Ctr81 Lst81 F10.7 Ctr81 Lst81\n")
 	sb.WriteString("# --------------------------------------------------------------------------------------------------------------------------------\n")
-	sb.WriteString("#\n\n")
+	sb.WriteString("#\n")
 
 	sb.WriteString(fmt.Sprintf("NUM_OBSERVED_POINTS %d\n", len(data.Observed)))
 	sb.WriteString("BEGIN OBSERVED\n")
